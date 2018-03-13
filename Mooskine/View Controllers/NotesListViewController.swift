@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import CoreData
 
 class NotesListViewController: UIViewController, UITableViewDataSource {
     /// A table view that displays a list of notes for a notebook
@@ -16,6 +17,7 @@ class NotesListViewController: UIViewController, UITableViewDataSource {
     var notebook: Notebook!
     
     var notes:[Note] = []
+    var dataController: DataController!
 
     /// A date formatter for date text in note cells
     let dateFormatter: DateFormatter = {
@@ -30,6 +32,19 @@ class NotesListViewController: UIViewController, UITableViewDataSource {
         navigationItem.title = notebook.name
         navigationItem.rightBarButtonItem = editButtonItem
         updateEditButtonState()
+        
+        let fetchRequest:NSFetchRequest<Note> = Note.fetchRequest()
+        let predicate = NSPredicate(format: "notebook == %@", notebook)
+        fetchRequest.predicate = predicate
+        
+        let sortDescriptor = NSSortDescriptor(key: "creationDate", ascending: true)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+        
+        guard let fetchedNotes = try? dataController.viewContext.fetch(fetchRequest) else {
+            print("Failed to fetch request")
+            return
+        }
+        notes = fetchedNotes
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -53,16 +68,22 @@ class NotesListViewController: UIViewController, UITableViewDataSource {
 
     // Adds a new `Note` to the end of the `notebook`'s `notes` array
     func addNote() {
-        // TODO: add note
-        // notebook.addNote()
-        tableView.insertRows(at: [IndexPath(row: numberOfNotes - 1, section: 0)], with: .fade)
+        let newNote = Note(context: dataController.viewContext)
+        newNote.text = "New Note"
+        newNote.creationDate = Date()
+        newNote.notebook = notebook
+        try? dataController.viewContext.save()
+        notes.insert(newNote, at: 0)
+        tableView.insertRows(at: [IndexPath(row: 0, section: 0)], with: .fade)
         updateEditButtonState()
     }
 
     // Deletes the `Note` at the specified index path
     func deleteNote(at indexPath: IndexPath) {
-        // TODO: remove note
-        // notebook.removeNote(at: indexPath.row)
+        let noteToDelete = notes[indexPath.row]
+        dataController.viewContext.delete(noteToDelete)
+        try? dataController.viewContext.save()
+        notes.remove(at: indexPath.row)
         tableView.deleteRows(at: [indexPath], with: .fade)
         if numberOfNotes == 0 {
             setEditing(false, animated: true)
